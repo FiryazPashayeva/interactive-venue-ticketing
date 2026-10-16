@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Venue Ticketing System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Sol Tərəf: Xəritə və İdarəetmə Paneli -->
+        <main class="venue-section">
+            <header>
+                <h1>Grand Theatre Ticketing</h1>
+                <p>Choose your seats and inspect details</p>
+            </header>
+
+            <!-- Zoom və Navigasiya Düymələri (Tələb olunan) -->
+            <div class="controls-bar">
+                <button id="zoom-in">Zoom In (+)</button>
+                <button id="zoom-out">Zoom Out (-)</button>
+                <button id="move-up">Up</button>
+                <button id="move-down">Down</button>
+                <button id="move-left">Left</button>
+                <button id="move-right">Right</button>
+                <button id="reset-view">Reset / Center</button>
+            </div>
+
+            <!-- Məkan Xəritəsi Konteyneri -->
+            <div class="map-viewport" id="map-viewport">
+                <div class="venue-map" id="venue-map">
+                    <div class="stage">STAGE</div>
+                    <!-- Oturacaqlar JavaScript vasitəsilə bura dinamik əlavə olunacaq -->
+                </div>
+            </div>
+        </main>
+
+        <!-- Sağ Tərəf: Oturacaq Detalları və Səbət -->
+        <aside class="sidebar">
+            <section class="inspection-panel">
+                <h2>Seat Inspection</h2>
+                <div id="seat-details">
+                    <p>Select a seat to view details.</p>
+                </div>
+                <button id="add-to-cart-btn" disabled>ADD TO CART</button>
+            </section>
+
+            <section class="cart-panel">
+                <h2>Your Cart</h2>
+                <ul id="cart-items">
+                    <!-- Səbət elementləri buraya gələcək -->
+                </ul>
+                <div class="cart-total">
+                    <strong>Total: <span id="total-price">0.00</span> AZN</strong>
+                </div>
+            </section>
+        </aside>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
