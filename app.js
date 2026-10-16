@@ -1,23 +1,26 @@
-// 1. Məkan və Oturacaqlar üçün Verilənlər Modeli
+// --- 1. VERİLƏNLƏR MODELİ (VENUE DATA) ---
 let venueData = [
-    { id: "A1", section: "VIP", row: "A", seat: 1, price: 100, status: "available" },
-    { id: "A2", section: "VIP", row: "A", seat: 2, price: 100, status: "available" },
-    { id: "A3", section: "VIP", row: "A", seat: 3, price: 100, status: "unavailable" },
-    { id: "A4", section: "VIP", row: "A", seat: 4, price: 100, status: "available" },
+    // VIP Princess Seats (Row A)
+    { id: "A1", section: "VIP Princess", row: "A", seat: 1, price: 120, status: "available" },
+    { id: "A2", section: "VIP Princess", row: "A", seat: 2, price: 120, status: "available" },
+    { id: "A3", section: "VIP Princess", row: "A", seat: 3, price: 120, status: "unavailable" },
+    { id: "A4", section: "VIP Princess", row: "A", seat: 4, price: 120, status: "available" },
     
-    { id: "B1", section: "Standard", row: "B", seat: 1, price: 50, status: "available" },
-    { id: "B2", section: "Standard", row: "B", seat: 2, price: 50, status: "available" },
-    { id: "B3", section: "Standard", row: "B", seat: 3, price: 50, status: "available" },
-    { id: "B4", section: "Standard", row: "B", seat: 4, price: 50, status: "unavailable" },
+    // Royal Sweet Seats (Row B)
+    { id: "B1", section: "Royal Sweet", row: "B", seat: 1, price: 80, status: "available" },
+    { id: "B2", section: "Royal Sweet", row: "B", seat: 2, price: 80, status: "available" },
+    { id: "B3", section: "Royal Sweet", row: "B", seat: 3, price: 80, status: "available" },
+    { id: "B4", section: "Royal Sweet", row: "B", seat: 4, price: 80, status: "unavailable" },
 
-    { id: "C1", section: "Economy", row: "C", seat: 1, price: 25, status: "available" },
-    { id: "C2", section: "Economy", row: "C", seat: 2, price: 25, status: "available" },
-    { id: "C3", section: "Economy", row: "C", seat: 3, price: 25, status: "available" },
-    { id: "C4", section: "Economy", row: "C", seat: 4, price: 25, status: "available" }
+    // Fairy Balcony Seats (Row C)
+    { id: "C1", section: "Fairy Balcony", row: "C", seat: 1, price: 45, status: "available" },
+    { id: "C2", section: "Fairy Balcony", row: "C", seat: 2, price: 45, status: "available" },
+    { id: "C3", section: "Fairy Balcony", row: "C", seat: 3, price: 45, status: "available" },
+    { id: "C4", section: "Fairy Balcony", row: "C", seat: 4, price: 45, status: "available" }
 ];
 
-let selectedSeat = null; // Hazırda yoxlanılan oturacaq
-let cart = []; // Səbətdəki biletlər
+let selectedSeat = null; // Hazırda baxılan (inspected) oturacaq
+let cart = []; // Səbət
 
 // DOM Elementləri
 const venueMap = document.getElementById("venue-map");
@@ -26,10 +29,10 @@ const addToCartBtn = document.getElementById("add-to-cart-btn");
 const cartItemsList = document.getElementById("cart-items");
 const totalPriceSpan = document.getElementById("total-price");
 
-// 2. localStorage-dən məlumatları yükləmək (Səhifə yenilənəndə bərpa)
+// --- 2. LOCALSTORAGE İDARƏETMƏSİ ---
 function loadFromStorage() {
-    const savedCart = localStorage.getItem("venue_cart");
-    const savedVenue = localStorage.getItem("venue_data");
+    const savedCart = localStorage.getItem("pink_venue_cart");
+    const savedVenue = localStorage.getItem("pink_venue_data");
 
     if (savedCart) {
         cart = JSON.parse(savedCart);
@@ -39,27 +42,34 @@ function loadFromStorage() {
     }
 }
 
-// 3. Məlumatları localStorage-də yadda saxlamaq
 function saveToStorage() {
-    localStorage.setItem("venue_cart", JSON.stringify(cart));
-    localStorage.setItem("venue_data", JSON.stringify(venueData));
+    localStorage.setItem("pink_venue_cart", JSON.stringify(cart));
+    localStorage.setItem("pink_venue_data", JSON.stringify(venueData));
 }
 
-// 4. Oturacaqları xəritədə dinamik render etmək
+// --- 3. DİNAMİK RENDER FUNKSİYALARI ---
 function renderSeats() {
     const stageHTML = venueMap.querySelector(".stage").outerHTML;
     venueMap.innerHTML = stageHTML;
 
     venueData.forEach(seatObj => {
         const seatBtn = document.createElement("button");
-        seatBtn.classList.add("seat", seatObj.status);
+        
+        // Klası təyin edirik (əgər həm də inspeksiya olunursa)
+        let currentClass = seatObj.status;
+        if (selectedSeat && selectedSeat.id === seatObj.id && seatObj.status === "available") {
+            currentClass = "inspected";
+        }
+
+        seatBtn.className = `seat ${currentClass}`;
         seatBtn.innerText = seatObj.id;
         seatBtn.dataset.id = seatObj.id;
 
-        if (seatObj.status === "unavailable" || seatObj.status === "in-cart") {
-            seatBtn.disabled = (seatObj.status === "unavailable"); // Səbətdəkidirsə sadəcə kliklənir amma yenidən əlavə oluna bilməz
+        if (seatObj.status === "unavailable") {
+            seatBtn.disabled = true;
         }
 
+        // Click hadisəsi
         seatBtn.addEventListener("click", () => {
             inspectSeat(seatObj.id);
         });
@@ -68,54 +78,47 @@ function renderSeats() {
     });
 }
 
-// 5. Oturacaq detallarını göstərmək (Inspection)
 function inspectSeat(seatId) {
     const seatObj = venueData.find(s => s.id === seatId);
     if (!seatObj) return;
 
-    // Əgər oturacaq artıq səbətdədirsə, inspeksiya zamanı xəbərdarlıq edə bilərik
     if (seatObj.status === "in-cart") {
-        seatDetailsDiv.innerHTML = `<p style="color: #d9534f;">This seat is already in your cart.</p>`;
+        seatDetailsDiv.innerHTML = `<p style="color: #c71585; font-weight: 500;">🎀 This ticket is already in your cart!</p>`;
         addToCartBtn.disabled = true;
+        selectedSeat = null;
+        renderSeats();
         return;
     }
 
     selectedSeat = seatObj;
+    renderSeats(); // Seçiilmiş oturacağı 'inspected' rənginə boyamaq üçün
 
     seatDetailsDiv.innerHTML = `
         <p><strong>Seat ID:</strong> ${seatObj.id}</p>
-        <p><strong>Section:</strong> ${seatObj.section}</p>
+        <p><strong>Zone:</strong> ${seatObj.section}</p>
         <p><strong>Row:</strong> ${seatObj.row} | <strong>Seat:</strong> ${seatObj.seat}</p>
-        <p><strong>Price:</strong> ${seatObj.price} AZN</p>
+        <p><strong>Price:</strong> <span style="color:#d87093; font-weight:bold;">${seatObj.price} AZN</span></p>
     `;
 
     addToCartBtn.disabled = false;
 }
 
-// 6. Səbəti yeniləmək və ekranda göstərmək
 function renderCart() {
     cartItemsList.innerHTML = "";
     let total = 0;
 
     if (cart.length === 0) {
-        cartItemsList.innerHTML = "<li>Your cart is empty.</li>";
+        cartItemsList.innerHTML = `<li class="placeholder-text" style="padding: 10px 0;">Your cart is currently empty.</li>`;
     }
 
     cart.forEach(item => {
         total += item.price;
         const li = document.createElement("li");
-        li.style.display = "flex";
-        li.style.justifyContent = "space-between";
-        li.style.alignItems = "center";
-        li.style.marginBottom = "8px";
-        li.style.padding = "5px";
-        li.style.background = "#fff";
-        li.style.border = "1px solid #ddd";
-        li.style.borderRadius = "4px";
+        li.className = "cart-item";
 
         li.innerHTML = `
-            <span>Seat ${item.id} (${item.section}) - ${item.price} AZN</span>
-            <button onclick="removeFromCart('${item.id}')" style="background: #dc3545; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer;">Remove</button>
+            <span><strong>${item.id}</strong> (${item.section}) - ${item.price} AZN</span>
+            <button class="remove-btn" onclick="removeFromCart('${item.id}')">Remove</button>
         `;
         cartItemsList.appendChild(li);
     });
@@ -123,58 +126,100 @@ function renderCart() {
     totalPriceSpan.innerText = total.toFixed(2);
 }
 
-// 7. ADD TO CART Düyməsi Funksionallığı
+// --- 4. SƏBƏT HƏRƏKƏTLƏRİ (ADD & REMOVE) ---
 addToCartBtn.addEventListener("click", () => {
     if (!selectedSeat) return;
 
-    // Təkrar əlavə olunmanın qarşısını almaq (Prevent duplicate)
+    // Duplikasiya önləmə
     if (cart.some(item => item.id === selectedSeat.id)) {
         alert("This seat is already in your cart!");
         return;
     }
 
-    // Oturacaq statusunu dəyişirik
     selectedSeat.status = "in-cart";
     cart.push(selectedSeat);
 
-    // Yaddaşı yeniləyirik
     saveToStorage();
+    
+    selectedSeat = null;
+    seatDetailsDiv.innerHTML = `<p class="placeholder-text">Click any available seat to inspect its details and price.</p>`;
+    addToCartBtn.disabled = true;
 
-    // Ekranı yeniləyirik
     renderSeats();
     renderCart();
-
-    // Paneli təmizləyirik
-    selectedSeat = null;
-    seatDetailsDiv.innerHTML = `<p>Select a seat to view details.</p>`;
-    addToCartBtn.disabled = true;
 });
 
-// 8. Səbətdən Silmək (Remove) və Xəritəni Sinxronlaşdırmaq
 window.removeFromCart = function(seatId) {
-    // Səbətdən çıxarırıq
     cart = cart.filter(item => item.id !== seatId);
 
-    // Xəritədəki oturacağın statusunu yenidən 'available' edirik
     const seatObj = venueData.find(s => s.id === seatId);
     if (seatObj) {
         seatObj.status = "available";
     }
 
-    // Yaddaşı və ekranı yeniləyirik
     saveToStorage();
     renderSeats();
     renderCart();
 
-    // Əgər silinən oturacaq hal-hazırda paneldə seçilibsə təmizləyirik
     if (selectedSeat && selectedSeat.id === seatId) {
         selectedSeat = null;
-        seatDetailsDiv.innerHTML = `<p>Select a seat to view details.</p>`;
+        seatDetailsDiv.innerHTML = `<p class="placeholder-text">Click any available seat to inspect its details and price.</p>`;
         addToCartBtn.disabled = true;
     }
 };
 
-// Səhifə açılan kimi işə düşən əsas funksiya
+// --- 5. NAVİQASİYA (ZOOM & PAN) MƏNTİQİ ---
+let currentZoom = 1;
+let translateX = 0;
+let translateY = 0;
+
+function updateMapTransform() {
+    venueMap.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoom})`;
+    venueMap.style.transformOrigin = "center center";
+}
+
+document.getElementById("zoom-in").addEventListener("click", () => {
+    if (currentZoom < 1.8) {
+        currentZoom += 0.15;
+        updateMapTransform();
+    }
+});
+
+document.getElementById("zoom-out").addEventListener("click", () => {
+    if (currentZoom > 0.6) {
+        currentZoom -= 0.15;
+        updateMapTransform();
+    }
+});
+
+document.getElementById("move-up").addEventListener("click", () => {
+    translateY -= 35;
+    updateMapTransform();
+});
+
+document.getElementById("move-down").addEventListener("click", () => {
+    translateY += 35;
+    updateMapTransform();
+});
+
+document.getElementById("move-left").addEventListener("click", () => {
+    translateX -= 35;
+    updateMapTransform();
+});
+
+document.getElementById("move-right").addEventListener("click", () => {
+    translateX += 35;
+    updateMapTransform();
+});
+
+document.getElementById("reset-view").addEventListener("click", () => {
+    currentZoom = 1;
+    translateX = 0;
+    translateY = 0;
+    updateMapTransform();
+});
+
+// --- İLİKİN YÜKLƏNMƏ ---
 loadFromStorage();
 renderSeats();
 renderCart();

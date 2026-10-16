@@ -3,56 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Venue Ticketing System</title>
+    <title>Princess Hall - Interactive Ticketing</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts: Poppins & Playfair Display -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <div class="app-container">
-        <!-- Sol Tərəf: Xəritə və İdarəetmə Paneli -->
+        <!-- Sol Tərəf: Məkan Xəritəsi və İdarəetmə Düymələri -->
         <main class="venue-section">
-            <header>
-                <h1>Grand Theatre Ticketing</h1>
-                <p>Choose your seats and inspect details</p>
+            <header class="main-header">
+                <h1>✨ Grand Pink Palace ✨</h1>
+                <p>Select your seats and reserve your magical night</p>
             </header>
 
-            <!-- Zoom və Navigasiya Düymələri (Tələb olunan) -->
+            <!-- Zoom & Pan Navigasiya Panel -->
             <div class="controls-bar">
-                <button id="zoom-in">Zoom In (+)</button>
-                <button id="zoom-out">Zoom Out (-)</button>
-                <button id="move-up">Up</button>
-                <button id="move-down">Down</button>
-                <button id="move-left">Left</button>
-                <button id="move-right">Right</button>
-                <button id="reset-view">Reset / Center</button>
+                <button id="zoom-in" title="Zoom In">🔍 +</button>
+                <button id="zoom-out" title="Zoom Out">🔍 -</button>
+                <button id="move-up" title="Move Up">⬆️</button>
+                <button id="move-down" title="Move Down">⬇️</button>
+                <button id="move-left" title="Move Left">⬅️</button>
+                <button id="move-right" title="Move Right">➡️</button>
+                <button id="reset-view" class="reset-btn">🔄 Center View</button>
             </div>
 
             <!-- Məkan Xəritəsi Konteyneri -->
             <div class="map-viewport" id="map-viewport">
                 <div class="venue-map" id="venue-map">
-                    <div class="stage">STAGE</div>
-                    <!-- Oturacaqlar JavaScript vasitəsilə bura dinamik əlavə olunacaq -->
+                    <div class="stage">🎀 MAIN STAGE 🎀</div>
+                    <!-- Dynamic seats rendered by JavaScript -->
                 </div>
+            </div>
+
+            <!-- Leqenda / Rəng İzahı -->
+            <div class="legend">
+                <span class="legend-item"><span class="color-dot available"></span> Available</span>
+                <span class="legend-item"><span class="color-dot inspected"></span> Selected</span>
+                <span class="legend-item"><span class="color-dot in-cart"></span> In Cart</span>
+                <span class="legend-item"><span class="color-dot unavailable"></span> Taken</span>
             </div>
         </main>
 
-        <!-- Sağ Tərəf: Oturacaq Detalları və Səbət -->
+        <!-- Sağ Tərəf: Inspeksiya Paneli və Səbət -->
         <aside class="sidebar">
-            <section class="inspection-panel">
-                <h2>Seat Inspection</h2>
-                <div id="seat-details">
-                    <p>Select a seat to view details.</p>
+            <section class="card inspection-panel">
+                <h2>🌸 Seat Details</h2>
+                <div id="seat-details" class="details-box">
+                    <p class="placeholder-text">Click any available seat to inspect its details and price.</p>
                 </div>
-                <button id="add-to-cart-btn" disabled>ADD TO CART</button>
+                <button id="add-to-cart-btn" class="pink-btn" disabled>💖 ADD TO CART</button>
             </section>
 
-            <section class="cart-panel">
-                <h2>Your Cart</h2>
-                <ul id="cart-items">
-                    <!-- Səbət elementləri buraya gələcək -->
+            <section class="card cart-panel">
+                <h2>🛍️ Your Cart</h2>
+                <ul id="cart-items" class="cart-list">
+                    <!-- Səbət elementləri buraya düşəcək -->
                 </ul>
-                <div class="cart-total">
-                    <strong>Total: <span id="total-price">0.00</span> AZN</strong>
+                <div class="cart-summary">
+                    <span>Total Amount:</span>
+                    <strong class="total-price"><span id="total-price">0.00</span> AZN</strong>
                 </div>
             </section>
         </aside>
