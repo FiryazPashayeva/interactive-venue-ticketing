@@ -135,3 +135,50 @@ header p {
     font-size: 18px;
     text-align: right;
 }
+
+/* Oturacaqların ümumi üslubu */
+.seat {
+    width: 45px;
+    height: 45px;
+    margin: 5px;
+    border: none;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+/* Xəritə içində oturacaqların səliqəli düzülüşü üçün */
+.venue-map {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: flex-start;
+    padding: 20px;
+    gap: 10px;
+}
+
+/* 1. Boş oturacaq (Available) */
+.seat.available {
+    background-color: #28a745;
+    color: white;
+}
+.seat.available:hover {
+    background-color: #218838;
+    transform: scale(1.05);
+}
+
+/* 2. Səbətdə olan oturacaq (In-Cart) */
+.seat.in-cart {
+    background-color: #ffc107;
+    color: #333;
+    cursor: not-allowed;
+}
+
+/* 3. Dolu/Mümkünsüz oturacaq (Unavailable) */
+.seat.unavailable {
+    background-color: #6c757d;
+    color: white;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
