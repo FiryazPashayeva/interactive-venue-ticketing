@@ -1,225 +1,229 @@
-// --- 1. VERİLƏNLƏR MODELİ (VENUE DATA) ---
-let venueData = [
-    // VIP Princess Seats (Row A)
-    { id: "A1", section: "VIP Princess", row: "A", seat: 1, price: 120, status: "available" },
-    { id: "A2", section: "VIP Princess", row: "A", seat: 2, price: 120, status: "available" },
-    { id: "A3", section: "VIP Princess", row: "A", seat: 3, price: 120, status: "unavailable" },
-    { id: "A4", section: "VIP Princess", row: "A", seat: 4, price: 120, status: "available" },
-    
-    // Royal Sweet Seats (Row B)
-    { id: "B1", section: "Royal Sweet", row: "B", seat: 1, price: 80, status: "available" },
-    { id: "B2", section: "Royal Sweet", row: "B", seat: 2, price: 80, status: "available" },
-    { id: "B3", section: "Royal Sweet", row: "B", seat: 3, price: 80, status: "available" },
-    { id: "B4", section: "Royal Sweet", row: "B", seat: 4, price: 80, status: "unavailable" },
+"use strict";
 
-    // Fairy Balcony Seats (Row C)
-    { id: "C1", section: "Fairy Balcony", row: "C", seat: 1, price: 45, status: "available" },
-    { id: "C2", section: "Fairy Balcony", row: "C", seat: 2, price: 45, status: "available" },
-    { id: "C3", section: "Fairy Balcony", row: "C", seat: 3, price: 45, status: "available" },
-    { id: "C4", section: "Fairy Balcony", row: "C", seat: 4, price: 45, status: "available" }
+// --- 1. VENUE DATA: seats are generated from this configuration ---
+const SECTIONS = [
+    { id: "vip",      name: "VIP Princess",  price: 120, rows: ["A", "B", "C"],           perRow: 12 },
+    { id: "premium",  name: "Royal Sweet",   price: 80,  rows: ["D", "E", "F", "G"],      perRow: 16 },
+    { id: "standard", name: "Fairy Balcony", price: 45,  rows: ["H", "I", "J", "K", "L"], perRow: 20 }
 ];
+const KEY = "venue_cart_v2";
+const MIN_Z = 0.3, MAX_Z = 2.5, STEP = 40;
 
-let selectedSeat = null; // Hazırda baxılan (inspected) oturacaq
-let cart = []; // Səbət
+const $ = id => document.getElementById(id);
+const viewport = $("map-viewport"), map = $("venue-map"), details = $("seat-details"),
+      addBtn = $("add-to-cart-btn"), cartList = $("cart-items"), totalEl = $("total-price"),
+      countEl = $("cart-count"), toastEl = $("toast");
 
-// DOM Elementləri
-const venueMap = document.getElementById("venue-map");
-const seatDetailsDiv = document.getElementById("seat-details");
-const addToCartBtn = document.getElementById("add-to-cart-btn");
-const cartItemsList = document.getElementById("cart-items");
-const totalPriceSpan = document.getElementById("total-price");
+const seats = [];
+const seatById = new Map();
+const buttons = new Map();
+const cartIds = new Set();     // single source of truth for the cart
+let inspectedId = null;
 
-// --- 2. LOCALSTORAGE İDARƏETMƏSİ ---
-function loadFromStorage() {
-    const savedCart = localStorage.getItem("pink_venue_cart");
-    const savedVenue = localStorage.getItem("pink_venue_data");
-
-    if (savedCart) {
-        cart = JSON.parse(savedCart);
-    }
-    if (savedVenue) {
-        venueData = JSON.parse(savedVenue);
-    }
+function buildVenue() {
+    SECTIONS.forEach(sec => sec.rows.forEach((row, r) => {
+        for (let n = 1; n <= sec.perRow; n++) {
+            const seat = { id: row + n, sectionId: sec.id, section: sec.name, row, number: n,
+                           price: sec.price, taken: (r * 7 + n * 13) % 11 === 0 };
+            seats.push(seat);
+            seatById.set(seat.id, seat);
+        }
+    }));
 }
 
-function saveToStorage() {
-    localStorage.setItem("pink_venue_cart", JSON.stringify(cart));
-    localStorage.setItem("pink_venue_data", JSON.stringify(venueData));
+// Seat state is always calculated, never stored by hand
+function getStatus(seat) {
+    if (seat.taken) return "unavailable";
+    if (cartIds.has(seat.id)) return "in-cart";
+    if (seat.id === inspectedId) return "inspected";
+    return "available";
 }
 
-// --- 3. DİNAMİK RENDER FUNKSİYALARI ---
-function renderSeats() {
-    const stageHTML = venueMap.querySelector(".stage").outerHTML;
-    venueMap.innerHTML = stageHTML;
-
-    venueData.forEach(seatObj => {
-        const seatBtn = document.createElement("button");
-        
-        // Klası təyin edirik (əgər həm də inspeksiya olunursa)
-        let currentClass = seatObj.status;
-        if (selectedSeat && selectedSeat.id === seatObj.id && seatObj.status === "available") {
-            currentClass = "inspected";
-        }
-
-        seatBtn.className = `seat ${currentClass}`;
-        seatBtn.innerText = seatObj.id;
-        seatBtn.dataset.id = seatObj.id;
-
-        if (seatObj.status === "unavailable") {
-            seatBtn.disabled = true;
-        }
-
-        // Click hadisəsi
-        seatBtn.addEventListener("click", () => {
-            inspectSeat(seatObj.id);
+// --- 2. RENDERING (venue is built once, then only classes change) ---
+function renderVenue() {
+    SECTIONS.forEach(sec => {
+        const zone = document.createElement("section");
+        zone.className = "zone zone-" + sec.id;
+        zone.innerHTML = `<h3>${sec.name} <span>${sec.price} AZN</span></h3>`;
+        sec.rows.forEach(row => {
+            const rowEl = document.createElement("div");
+            rowEl.className = "row";
+            rowEl.innerHTML = `<span class="row-label">${row}</span>`;
+            for (let n = 1; n <= sec.perRow; n++) {
+                if (n === sec.perRow / 2 + 1) rowEl.insertAdjacentHTML("beforeend", '<span class="aisle"></span>');
+                const seat = seatById.get(row + n);
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "seat " + getStatus(seat);
+                btn.textContent = seat.number;
+                btn.dataset.id = seat.id;
+                btn.disabled = seat.taken;
+                btn.setAttribute("aria-label", `Seat ${seat.id}, ${seat.section}, ${seat.price} AZN`);
+                buttons.set(seat.id, btn);
+                rowEl.appendChild(btn);
+            }
+            zone.appendChild(rowEl);
         });
-
-        venueMap.appendChild(seatBtn);
+        map.appendChild(zone);
     });
 }
 
-function inspectSeat(seatId) {
-    const seatObj = venueData.find(s => s.id === seatId);
-    if (!seatObj) return;
+function updateSeat(id) {
+    const seat = seatById.get(id), btn = buttons.get(id);
+    if (seat && btn) btn.className = "seat " + getStatus(seat);
+}
 
-    if (seatObj.status === "in-cart") {
-        seatDetailsDiv.innerHTML = `<p style="color: #c71585; font-weight: 500;">🎀 This ticket is already in your cart!</p>`;
-        addToCartBtn.disabled = true;
-        selectedSeat = null;
-        renderSeats();
-        return;
-    }
+function resetDetails() {
+    details.innerHTML = '<p class="placeholder">Click any available seat to see its details and price.</p>';
+    addBtn.disabled = true;
+    addBtn.textContent = "ADD TO CART";
+}
 
-    selectedSeat = seatObj;
-    renderSeats(); // Seçiilmiş oturacağı 'inspected' rənginə boyamaq üçün
-
-    seatDetailsDiv.innerHTML = `
-        <p><strong>Seat ID:</strong> ${seatObj.id}</p>
-        <p><strong>Zone:</strong> ${seatObj.section}</p>
-        <p><strong>Row:</strong> ${seatObj.row} | <strong>Seat:</strong> ${seatObj.seat}</p>
-        <p><strong>Price:</strong> <span style="color:#d87093; font-weight:bold;">${seatObj.price} AZN</span></p>
-    `;
-
-    addToCartBtn.disabled = false;
+function showDetails(seat) {
+    const inCart = cartIds.has(seat.id);
+    details.innerHTML = `
+        <p><strong>Seat:</strong> ${seat.id}</p>
+        <p><strong>Zone:</strong> ${seat.section}</p>
+        <p><strong>Row:</strong> ${seat.row} | <strong>Seat no.:</strong> ${seat.number}</p>
+        <p><strong>Price:</strong> <span class="price">${seat.price} AZN</span></p>`;
+    addBtn.disabled = inCart;
+    addBtn.textContent = inCart ? "ALREADY IN CART" : "ADD TO CART";
 }
 
 function renderCart() {
-    cartItemsList.innerHTML = "";
     let total = 0;
-
-    if (cart.length === 0) {
-        cartItemsList.innerHTML = `<li class="placeholder-text" style="padding: 10px 0;">Your cart is currently empty.</li>`;
-    }
-
-    cart.forEach(item => {
-        total += item.price;
-        const li = document.createElement("li");
-        li.className = "cart-item";
-
-        li.innerHTML = `
-            <span><strong>${item.id}</strong> (${item.section}) - ${item.price} AZN</span>
-            <button class="remove-btn" onclick="removeFromCart('${item.id}')">Remove</button>
-        `;
-        cartItemsList.appendChild(li);
+    cartList.innerHTML = cartIds.size ? "" : '<li class="placeholder cart-item">Your cart is empty.</li>';
+    cartIds.forEach(id => {
+        const s = seatById.get(id);
+        total += s.price;
+        cartList.insertAdjacentHTML("beforeend", `
+            <li class="cart-item">
+                <span><strong>${s.id}</strong> ${s.section}</span>
+                <span>${s.price} AZN</span>
+                <button type="button" class="remove-btn" data-remove="${s.id}" aria-label="Remove seat ${s.id}">Remove</button>
+            </li>`);
     });
-
-    totalPriceSpan.innerText = total.toFixed(2);
+    totalEl.textContent = total.toFixed(2);
+    countEl.textContent = cartIds.size;
 }
 
-// --- 4. SƏBƏT HƏRƏKƏTLƏRİ (ADD & REMOVE) ---
-addToCartBtn.addEventListener("click", () => {
-    if (!selectedSeat) return;
-
-    // Duplikasiya önləmə
-    if (cart.some(item => item.id === selectedSeat.id)) {
-        alert("This seat is already in your cart!");
-        return;
-    }
-
-    selectedSeat.status = "in-cart";
-    cart.push(selectedSeat);
-
-    saveToStorage();
-    
-    selectedSeat = null;
-    seatDetailsDiv.innerHTML = `<p class="placeholder-text">Click any available seat to inspect its details and price.</p>`;
-    addToCartBtn.disabled = true;
-
-    renderSeats();
-    renderCart();
-});
-
-window.removeFromCart = function(seatId) {
-    cart = cart.filter(item => item.id !== seatId);
-
-    const seatObj = venueData.find(s => s.id === seatId);
-    if (seatObj) {
-        seatObj.status = "available";
-    }
-
-    saveToStorage();
-    renderSeats();
-    renderCart();
-
-    if (selectedSeat && selectedSeat.id === seatId) {
-        selectedSeat = null;
-        seatDetailsDiv.innerHTML = `<p class="placeholder-text">Click any available seat to inspect its details and price.</p>`;
-        addToCartBtn.disabled = true;
-    }
-};
-
-// --- 5. NAVİQASİYA (ZOOM & PAN) MƏNTİQİ ---
-let currentZoom = 1;
-let translateX = 0;
-let translateY = 0;
-
-function updateMapTransform() {
-    venueMap.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoom})`;
-    venueMap.style.transformOrigin = "center center";
+let toastTimer;
+function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200);
 }
 
-document.getElementById("zoom-in").addEventListener("click", () => {
-    if (currentZoom < 1.8) {
-        currentZoom += 0.15;
-        updateMapTransform();
-    }
+// --- 3. ACTIONS ---
+function inspectSeat(id) {
+    const prev = inspectedId;
+    inspectedId = id;
+    if (prev) updateSeat(prev);
+    updateSeat(id);
+    showDetails(seatById.get(id));
+}
+
+function addToCart() {
+    const seat = seatById.get(inspectedId);
+    if (!seat || seat.taken) return;
+    if (cartIds.has(seat.id)) { toast("This seat is already in your cart."); return; }
+    cartIds.add(seat.id);
+    inspectedId = null;
+    save();
+    updateSeat(seat.id);
+    resetDetails();
+    renderCart();
+}
+
+function removeFromCart(id) {
+    cartIds.delete(id);
+    save();
+    updateSeat(id);
+    renderCart();
+    if (inspectedId === id) showDetails(seatById.get(id));
+}
+
+addBtn.addEventListener("click", addToCart);
+cartList.addEventListener("click", e => {
+    const btn = e.target.closest("[data-remove]");
+    if (btn) removeFromCart(btn.dataset.remove);
+});
+map.addEventListener("click", e => {
+    const btn = e.target.closest(".seat");
+    if (moved) { moved = false; return; }          // a drag must not select a seat
+    if (btn && !btn.disabled) inspectSeat(btn.dataset.id);
 });
 
-document.getElementById("zoom-out").addEventListener("click", () => {
-    if (currentZoom > 0.6) {
-        currentZoom -= 0.15;
-        updateMapTransform();
-    }
-});
+// --- 4. LOCALSTORAGE: only seat IDs are saved ---
+function save() {
+    try { localStorage.setItem(KEY, JSON.stringify([...cartIds])); } catch (e) { /* storage unavailable */ }
+}
+function load() {
+    try {
+        (JSON.parse(localStorage.getItem(KEY)) || []).forEach(id => {
+            const s = seatById.get(id);
+            if (s && !s.taken) cartIds.add(id);    // ignore invalid or taken seats
+        });
+    } catch (e) { localStorage.removeItem(KEY); }
+}
 
-document.getElementById("move-up").addEventListener("click", () => {
-    translateY -= 35;
-    updateMapTransform();
-});
+// --- 5. NAVIGATION: zoom, move, reset ---
+let zoom = 1, tx = 0, ty = 0;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-document.getElementById("move-down").addEventListener("click", () => {
-    translateY += 35;
-    updateMapTransform();
-});
+function applyView() {
+    const mx = map.offsetWidth * zoom / 2, my = map.offsetHeight * zoom / 2;
+    tx = clamp(tx, -mx, mx);
+    ty = clamp(ty, -my, my);
+    map.style.transform = `translate(-50%, -50%) translate(${tx}px, ${ty}px) scale(${zoom})`;
+}
+function zoomBy(f) { zoom = clamp(zoom * f, MIN_Z, MAX_Z); applyView(); }
+function moveBy(dx, dy) { tx += dx; ty += dy; applyView(); }
+function resetView() {
+    const fit = Math.min(viewport.clientWidth / (map.offsetWidth + 30), viewport.clientHeight / (map.offsetHeight + 30), 1.5);
+    zoom = clamp(fit, MIN_Z, MAX_Z);
+    tx = ty = 0;
+    applyView();
+}
 
-document.getElementById("move-left").addEventListener("click", () => {
-    translateX -= 35;
-    updateMapTransform();
-});
+$("zoom-in").addEventListener("click", () => zoomBy(1.2));
+$("zoom-out").addEventListener("click", () => zoomBy(1 / 1.2));
+$("move-up").addEventListener("click", () => moveBy(0, -STEP));
+$("move-down").addEventListener("click", () => moveBy(0, STEP));
+$("move-left").addEventListener("click", () => moveBy(-STEP, 0));
+$("move-right").addEventListener("click", () => moveBy(STEP, 0));
+$("reset-view").addEventListener("click", resetView);
 
-document.getElementById("move-right").addEventListener("click", () => {
-    translateX += 35;
-    updateMapTransform();
+// --- 6. BONUS: mouse-wheel zoom and click/drag panning (pointer events also work on touch) ---
+let drag = null, moved = false;
+viewport.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    drag = { x: e.clientX, y: e.clientY, tx, ty };
+    moved = false;
 });
-
-document.getElementById("reset-view").addEventListener("click", () => {
-    currentZoom = 1;
-    translateX = 0;
-    translateY = 0;
-    updateMapTransform();
+window.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!moved && Math.hypot(dx, dy) < 5) return;  // small movement is still a click
+    moved = true;
+    viewport.classList.add("dragging");
+    tx = drag.tx + dx;
+    ty = drag.ty + dy;
+    applyView();
 });
+window.addEventListener("pointerup", () => { drag = null; viewport.classList.remove("dragging"); });
+viewport.addEventListener("wheel", e => {
+    e.preventDefault();
+    zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+}, { passive: false });
+window.addEventListener("resize", resetView);
+window.addEventListener("load", resetView);
 
-// --- İLİKİN YÜKLƏNMƏ ---
-loadFromStorage();
-renderSeats();
+// --- INIT ---
+buildVenue();
+load();
+renderVenue();
 renderCart();
+resetDetails();
+resetView();
